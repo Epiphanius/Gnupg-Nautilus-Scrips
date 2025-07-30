@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# symmetrisch verschlüsseln - mit pgp Version 2.4.4 getestet
+#
+# Autor: harald - (UbuntuUsers.de), als Prompter und Ergänzer der Ausgaben eines Large Language Models  
+# Lizenz: Public Domain
+# Version vom 13.07.2025
+#########################################################################
+
+# Überprüfung ob mindestens eine Datei ausgewählt wurde
+if [ $# -eq 0 ]; then
+    zenity --error --text="Keine Datei ausgewählt."
+    exit 1
+fi
+
+#Sicherstellen, dass zenity und gpg installiert sind
+command -v gpg >/dev/null 2>&1 || { zenity --error --text="Gpg nicht gefunden"; exit 1; }
+command -v zenity >/dev/null 2>&1 || { echo "Zenity nicht gefunden"; exit 1; }
+
+
+for FILE in "$@"; do
+
+    # Mit Zenity nach dem Passwort fragen und ein zweites Mal zur Bestätigung
+    PASSPHRASE=$(zenity --password --title="Passwort für die symmetrische Verschlüsselung")
+    [ $? -ne 0 ] && exit 1
+
+    CONFIRM_PASSPHRASE=$(zenity --password --title="Passwort bestätigen")
+    [ $? -ne 0 ] && exit 1
+
+    if [ "$PASSPHRASE" != "$CONFIRM_PASSPHRASE" ]; then
+        zenity --error --text="Die Passwörter stimmen nicht überein!"
+        exit 1
+    fi
+
+    OUTPUT="${FILE}.gpg"
+
+    # Symmetrisch verschlüsseln
+    gpg --batch --yes --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$OUTPUT" "$FILE"
+    #rm -- "$FILE" (falls das Original gleich gelöscht werden soll)
+    if [ $? -eq 0 ]; then
+        notify-send "GPG Verschlüsselung" "Erfolgreich verschlüsselt: $FILE"
+        zenity --info --text="Erfolgreich verschlüsselt:\n$OUTPUT"
+    else
+        notify-send "GPG Verschlüsselung" "Die Verschlüsselung für: $FILE hat nicht funktioniert!"
+        zenity --error --text="Die Verschlüsselung für:\n$FILE hat nicht geklappt"
+    fi
+
+done

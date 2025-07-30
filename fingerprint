@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# Check that a file was provided
+if [ -z "$1" ]; then
+    zenity --error --text="No file selected!"
+    exit 1
+fi
+
+FILE="$1"
+
+# Optional: Check file extension
+if [[ ! "$FILE" =~ \.(asc|sig)$ ]]; then
+    zenity --question \
+        --title="Not a standard signature file" \
+        --text="The selected file does not have a typical .asc or .sig extension. Continue anyway?"
+
+    if [[ $? -ne 0 ]]; then
+        exit 1
+    fi
+fi
+
+# Try to extract signature info
+OUTPUT=$(gpg --list-packets "$FILE" 2>&1)
+
+if [[ $? -ne 0 ]]; then
+    zenity --error --text="Failed to read signature file.\n\n$OUTPUT"
+    exit 1
+fi
+
+# Try to extract fingerprint
+# This assumes the signature file contains a keyid / fingerprint block
+# We'll grep for "fingerprint" in the packet dump
+FPR=$(echo "$OUTPUT" | grep -i fingerprint | head -n 1)
+
+if [[ -z "$FPR" ]]; then
+    zenity --info --text="No fingerprint found in the signature file."
+else
+    zenity --info --text="Fingerprint found:\n\n$FPR"
+fi
+
+exit 0
+

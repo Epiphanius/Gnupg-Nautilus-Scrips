@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# Name
+NAME=$(zenity --entry --title="Neues GPG-Schlüsselpaar" --text="Vollständiger Name:")
+[ $? -ne 0 ] && exit 0
+
+# E-Mail
+EMAIL=$(zenity --entry --title="Neues GPG-Schlüsselpaar" --text="E-Mail-Adresse:")
+[ $? -ne 0 ] && exit 0
+
+# Kommentar
+COMMENT=$(zenity --entry --title="Neues GPG-Schlüsselpaar" --text="Kommentar (optional):")
+[ $? -ne 0 ] && exit 0
+
+# Schlüssellänge
+KEYSIZE=$(zenity --list --radiolist \
+    --title="Schlüssellänge wählen" \
+    --text="Bitte die Schlüssellänge auswählen:" \
+    --column="Ausgewählt" --column="Bits" \
+    TRUE 2048 FALSE 3072 FALSE 4096)
+[ $? -ne 0 ] && exit 0
+
+# Gültigkeit
+EXPIRE=$(zenity --entry --title="Neues GPG-Schlüsselpaar" --text="Gültigkeit (z. B. 0 = niemals, 1y = 1 Jahr):" --entry-text="0")
+[ $? -ne 0 ] && exit 0
+
+# Passphrase
+PASSPHRASE=$(zenity --password --title="Neues GPG-Schlüsselpaar" --text="Passphrase für den privaten Schlüssel eingeben:")
+[ $? -ne 0 ] && exit 0
+
+# Prüfen auf leere Felder
+if [[ -z "$NAME" || -z "$EMAIL" || -z "$KEYSIZE" || -z "$EXPIRE" || -z "$PASSPHRASE" ]]; then
+    zenity --error --text="Alle Felder (außer Kommentar) müssen ausgefüllt sein."
+    exit 1
+fi
+
+# User-ID zusammensetzen
+USERID="$NAME"
+if [ -n "$COMMENT" ]; then
+    USERID="$USERID ($COMMENT)"
+fi
+USERID="$USERID <$EMAIL>"
+
+# RSA-Schlüssel erzeugen
+gpg --batch --pinentry-mode loopback --passphrase "$PASSPHRASE" \
+    --quick-gen-key "$USERID" "rsa$KEYSIZE" sign,encrypt $EXPIRE
+
+if [ $? -eq 0 ]; then
+    zenity --info --text="Das GPG-RSA-Schlüsselpaar wurde erfolgreich erstellt."
+
+    # Öffentlichen Schlüssel exportieren
+    PUBFILE=$(zenity --file-selection --save --confirm-overwrite --title="Öffentlichen Schlüssel speichern als" --filename="${EMAIL}_pubkey.asc")
+    if [ $? -eq 0 ]; then
+        gpg --armor --export "$EMAIL" > "$PUBFILE"
+        if [ $? -eq 0 ]; then
+            zenity --info --text="Öffentlicher Schlüssel gespeichert:\n$PUBFILE"
+        else
+            zenity --error --text="Fehler beim Export des öffentlichen Schlüssels."
+        fi
+    fi
+else
+    zenity --error --text="Fehler beim Erzeugen des GPG-Schlüssels."
+fi
+

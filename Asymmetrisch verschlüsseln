@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# asymmetrisch verschlüsseln - mit pgp Version 2.4.4 getestet
+#
+# Autor: harald - (UbuntuUsers.de), als Prompter und Ergänzer der Ausgaben eines Large Language Models  
+# Lizenz: Public Domain
+# Version vom 8.07.2025
+#
+# Check if at least one file is selected
+if [ $# -eq 0 ]; then
+    zenity --error --text="Keine Datei ausgewählt"
+    exit 1
+fi
+
+#Sicherstellen, dass zenity und gpg installiert sind
+command -v gpg >/dev/null 2>&1 || { zenity --error --text="Gpg nicht gefunden"; exit 1; }
+command -v zenity >/dev/null 2>&1 || { echo "Zenity nicht gefunden"; exit 1; }
+
+# Get the list of keys for selection
+RECIPIENT=$(gpg --list-keys --with-colons | awk -F: '/^uid:/ {print $10}' | zenity --list --title="Empfänger auswählen" --column="Empfänger" --height=400)
+
+if [ -z "$RECIPIENT" ]; then
+    zenity --error --text="Kein Empfänger ausgewählt."
+    exit 1
+fi
+
+for FILE in "$@"; do
+
+    OUTPUT="${FILE}.asc"
+
+    # Encrypt the file to the recipient
+    #gpg --batch --yes --armor --encrypt --recipient "$RECIPIENT" -o "$OUTPUT" "$FILE" (Version für ASCII Ausgabe)
+     gpg --batch --yes --encrypt --recipient "$RECIPIENT" -o "$OUTPUT" "$FILE" # (Binäre Ausgabe)
+    #rm -- "$FILE" (falls das Original gleich gelöscht werden soll)
+    if [ $? -eq 0 ]; then
+        notify-send "GPG Verschlüsselung" "Erfolgreich verschlüsselt:\n$FILE"
+        zenity --info --text="Erfolgreich verschlüsselt:\n$OUTPUT"
+    else
+        notify-send "GPG Verschlüsselung" "Die Verschlüsselung hat nicht funktioniert:\n$FILE"
+        zenity --error --text="Die Verschlüsselung hat nicht funktioniert:\n$FILE"
+    fi
+
+done
+

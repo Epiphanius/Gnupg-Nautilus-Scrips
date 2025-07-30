@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Überprüfen ob eine Datei ausgewählt wurde
+if [ $# -eq 0 ]; then
+    zenity --error --text="Keine Datei ausgewählt."
+    exit 1
+fi
+
+#Sicherstellen, dass zenity und gpg installiert sind
+command -v gpg >/dev/null 2>&1 || { zenity --error --text="Gpg nicht gefunden"; exit 1; }
+command -v zenity >/dev/null 2>&1 || { echo "Zenity nicht gefunden"; exit 1; }
+
+
+for FILE in "$@"; do
+
+    # Schlägt einen Dateinamen für die Ausgabe vor
+    if [[ "$FILE" == *.gpg ]]; then
+        OUTPUT="${FILE%.gpg}"
+    elif [[ "$FILE" == *.asc ]]; then
+        OUTPUT="${FILE%.asc}"
+    else
+        # Default Dateiendung
+        OUTPUT="${FILE}.decrypted"
+    fi
+
+    # Benutzer auffordern, den Ausgabedateinamen zu bestätigen oder zu ändern
+    OUTPUT=$(zenity --entry \
+        --title="GPG Entschlüsseln" \
+        --text="Name der Ausgabedatei eingeben:" \
+        --entry-text="$OUTPUT")
+
+    # Wenn der Benutzer abbricht, überspringe diese Datei
+    if [ -z "$OUTPUT" ]; then
+        zenity --warning --text="Entschlüsselung für $FILE abgebrochen"
+        continue
+    fi
+
+    # Entschlüssle die Datei
+    gpg --batch --yes -o "$OUTPUT" -d "$FILE"
+    if [ $? -eq 0 ]; then
+        notify-send "GPG Entschlüsselung" "Erfolgreich entschlüsselt:\n$FILE"
+        zenity --info --text="Erfolgreich entschlüsselt:\n$OUTPUT"
+    else
+        notify-send "GPG Entschlüsselung" "Entschlüsselung fehlgeschlagen für:\n$FILE"
+        zenity --error --text="Entschlüsselung fehlgeschlagen für:\n$FILE"
+    fi
+
+done
+
+
+
+

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Holt die ausgewählte Datei aus Nautilus
+FILE="$1"
+#Sicherstellen, dass zenity und gpg installiert sind
+command -v gpg >/dev/null 2>&1 || { zenity --error --text="Gpg nicht gefunden"; exit 1; }
+command -v zenity >/dev/null 2>&1 || { echo "Zenity nicht gefunden"; exit 1; }
+
+# Prüfen, ob eine Datei ausgewählt wurde
+if [[ -z "$FILE" ]]; then
+  zenity --error --text="Keine Datei ausgewählt."
+  exit 1
+fi
+
+# Dateierweiterung prüfen
+if [[ "$FILE" =~ \.asc$ || "$FILE" =~ \.sig$ ]]; then
+  SIGNATURE_FILE="$FILE"
+ # Versuche, die signierte Datei zu erraten, indem du .asc oder .sig entfernst
+  SIGNED_FILE="${FILE%.asc}"
+  SIGNED_FILE="${SIGNED_FILE%.sig}"
+
+  # Nach der signierten Datei fragen, wenn sie nicht existiert
+  if [[ ! -f "$SIGNED_FILE" ]]; then
+    SIGNED_FILE=$(zenity --file-selection --title="Wähle die signierte Datei aus")
+    if [[ -z "$SIGNED_FILE" || ! -f "$SIGNED_FILE" ]]; then
+      zenity --error --text="Signierte Datei nicht ausgewählt oder nicht vorhanden."
+      exit 1
+    fi
+  fi
+else
+  zenity --error --text="Bitte wähle eine .asc oder .sig Signaturdatei aus."
+  exit 1
+fi
+
+# GPG-Prüfung durchführen und die gesamte Ausgabe aufzeichnen (stdout + stderr)
+OUTPUT=$(gpg --verify "$SIGNATURE_FILE" "$SIGNED_FILE" 2>&1)
+
+# Ausgabe im scrollbaren Zenity-Textinfodialog anzeigen
+zenity --text-info \
+  --title="Ergebnis der GPG-Prüfung" \
+  --width=600 --height=400 \
+  --filename=<(echo "$OUTPUT")
+
+# Gibt den gleichen Exit-Code zurück wie gpg
+exit $?
+

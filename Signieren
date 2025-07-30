@@ -1,0 +1,36 @@
+#!/bin/bash
+#Signieren mit GPG
+#Sicherstellen, dass zenity und gpg installiert sind
+command -v gpg >/dev/null 2>&1 || { zenity --error --text="Gpg nicht gefunden"; exit 1; }
+command -v zenity >/dev/null 2>&1 || { echo "Zenity nicht gefunden"; exit 1; }
+
+# Schleife durch alle ausgewählten Dateien
+for FILE in "$@"; do
+  if [[ ! -f "$FILE" ]]; then
+    zenity --error --text="Invalid file: $FILE"
+    continue
+  fi
+
+# Den Benutzer bitten, die Unterzeichnung zu bestätigen
+  SIGNER=$(gpg --list-secret-keys --with-colons | awk -F: '/^uid:/ {print $10}' | zenity --list --title="Schlüssel zum Unterschreiben auswählen" --column="GPG Key ID / UID" --height=300)
+  if [[ -z "$SIGNER" ]]; then
+    zenity --error --text="Nichts ausgewählt. Abbruch."
+    exit 1
+  fi
+
+ # Dateiname der Ausgabesignatur festlegen
+  SIG_FILE="${FILE}.asc"
+
+  # Unterzeichnung durchführen
+  OUTPUT=$(gpg --armor --local-user "$SIGNER" --output "$SIG_FILE" --detach-sign "$FILE" 2>&1)
+  STATUS=$?
+
+  if [[ $STATUS -eq 0 ]]; then
+    zenity --info --title="GPG-Signatur erstellt" \
+      --text="Signatur erfolgreich erstellt:\n\n$SIG_FILE"
+  else
+    zenity --error --title="GPG-Signierung fehlgeschlagen" \
+      --width=400 --text="Beim Signieren ist ein Fehler aufgetreten:\n\n$OUTPUT"
+  fi
+done
+
