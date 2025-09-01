@@ -1,4 +1,4 @@
-show_on_desktop_temp
+Gnupg-Nautilus-Scrips
 Copyright (c) 2025 Epiphanius Harald Wenzel
 
 This project is dual-licensed under Apache-2.0 OR CC0-1.0 (your choice).
